@@ -13,12 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import datetime
 from itertools import islice
 
 import bottlenose
 from lxml import objectify, etree
 import dateutil.parser
+from time import sleep
+from urllib2 import HTTPError
 
 
 # https://kdp.amazon.com/help?topicId=A1CT8LK6UW2FXJ
@@ -151,9 +152,22 @@ class AmazonAPI(object):
             kwargs['Version'] = '2013-08-01'
 
         self.api = bottlenose.Amazon(
-            aws_key, aws_secret, aws_associate_tag, **kwargs)
+            aws_key, aws_secret, aws_associate_tag, ErrorHandler=self.error_handler, **kwargs)
         self.aws_associate_tag = aws_associate_tag
         self.region = kwargs.get('Region', 'US')
+        self.attempt = 0
+
+    def error_handler(self, err):
+        """Error handler for 503 (going over query limit)
+        Attempts retry when error_handler returns true
+        """
+        ex = err['exception']
+        if isinstance(ex, HTTPError) and ex.code == 503 and self.attempt <= 6:
+            print self.attempt
+            sleep(2 ** self.attempt)
+            self.attempt += 1
+            return True
+        return False
 
     def lookup(self, ResponseGroup="Large", **kwargs):
         """Lookup an Amazon Product.
@@ -163,6 +177,7 @@ class AmazonAPI(object):
             or a list of  :class:`~.AmazonProduct` instances if multiple
             items where returned.
         """
+        self.attempt = 1
         response = self.api.ItemLookup(ResponseGroup=ResponseGroup, **kwargs)
         root = objectify.fromstring(response)
         if root.Items.Request.IsValid == 'False':
@@ -198,6 +213,7 @@ class AmazonAPI(object):
         Example:
             >>> api.similarity_lookup(ItemId='B002L3XLBO,B000LQTBKI')
         """
+        self.attempt = 1
         response = self.api.SimilarityLookup(
             ResponseGroup=ResponseGroup, **kwargs)
         root = objectify.fromstring(response)
@@ -224,6 +240,7 @@ class AmazonAPI(object):
         Example:
             >>> api.browse_node_lookup(BrowseNodeId='163357')
         """
+        self.attempt = 1
         response = self.api.BrowseNodeLookup(
             ResponseGroup=ResponseGroup, **kwargs)
         root = objectify.fromstring(response)
@@ -243,6 +260,7 @@ class AmazonAPI(object):
         """
         region = kwargs.get('region', self.region)
         kwargs.update({'region': region})
+        self.attempt = 1
         return AmazonSearch(self.api, self.aws_associate_tag, **kwargs)
 
     def search_n(self, n, **kwargs):
@@ -255,6 +273,7 @@ class AmazonAPI(object):
         """
         region = kwargs.get('region', self.region)
         kwargs.update({'region': region})
+        self.attempt = 1
         items = AmazonSearch(self.api, self.aws_associate_tag, **kwargs)
         return list(islice(items, n))
 
@@ -286,6 +305,7 @@ class AmazonAPI(object):
             kwargs[offer_id_key_template % (i, )] = item['offer_id']
             kwargs[quantity_key_template % (i, )] = item['quantity']
 
+        self.attempt = 1
         response = self.api.CartCreate(**kwargs)
         root = objectify.fromstring(response)
 
@@ -322,6 +342,7 @@ class AmazonAPI(object):
             kwargs[offer_id_key_template % (i, )] = item['offer_id']
             kwargs[quantity_key_template % (i, )] = item['quantity']
 
+        self.attempt = 1
         response = self.api.CartAdd(CartId=CartId, HMAC=HMAC, **kwargs)
         root = objectify.fromstring(response)
 
@@ -338,6 +359,7 @@ class AmazonAPI(object):
         """
         if not CartId or not HMAC:
             raise CartException('CartId required for CartClear call')
+        self.attempt = 1
         response = self.api.CartClear(CartId=CartId, HMAC=HMAC, **kwargs)
         root = objectify.fromstring(response)
 
@@ -354,6 +376,7 @@ class AmazonAPI(object):
         """
         if not CartId or not HMAC:
             raise CartException('CartId required for CartGet call')
+        self.attempt = 1
         response = self.api.CartGet(CartId=CartId, HMAC=HMAC, **kwargs)
         root = objectify.fromstring(response)
 
@@ -392,6 +415,7 @@ class AmazonAPI(object):
             kwargs[cart_item_id_key_template % (i, )] = item['cart_item_id']
             kwargs[quantity_key_template % (i, )] = item['quantity']
 
+        self.attempt = 1
         response = self.api.CartModify(CartId=CartId, HMAC=HMAC, **kwargs)
         root = objectify.fromstring(response)
 

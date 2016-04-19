@@ -1,3 +1,4 @@
+import threading
 import unittest
 
 from nose.tools import assert_equals, assert_true, assert_false
@@ -135,6 +136,16 @@ class TestAmazonApi(unittest.TestCase):
             break
         else:
             assert_true(False, 'No search results returned.')
+
+    def test_search_throttle(self):
+        def test_search():
+            products = self.amazon.search(Keywords='kindle', SearchIndex='All')
+            for _ in products:
+                pass
+
+        for x in range(0, 5):
+            thread = threading.Thread(target=test_search)
+            thread.start()
 
     def test_search_n(self):
         """Test Product Search N.
