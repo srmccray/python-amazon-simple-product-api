@@ -156,13 +156,14 @@ class AmazonAPI(object):
         self.aws_associate_tag = aws_associate_tag
         self.region = kwargs.get('Region', 'US')
         self.attempt = 0
+        self.max_attempt = 5 if 'max_attempt' not in kwargs else kwargs['max_attempt']
 
     def error_handler(self, err):
         """Error handler for 503 (going over query limit)
         Attempts retry when error_handler returns true
         """
         ex = err['exception']
-        if isinstance(ex, HTTPError) and ex.code == 503 and self.attempt <= 6:
+        if isinstance(ex, HTTPError) and ex.code == 503 and self.attempt <= self.max_attempt:
             print self.attempt
             sleep(2 ** self.attempt)
             self.attempt += 1
