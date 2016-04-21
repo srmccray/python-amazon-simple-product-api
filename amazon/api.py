@@ -94,7 +94,7 @@ class BrowseNodeLookupException(AmazonException):
 
 
 class AmazonAPI(object):
-    def __init__(self, aws_key, aws_secret, aws_associate_tag, **kwargs):
+    def __init__(self, aws_key, aws_secret, aws_associate_tag, max_attempts=4, **kwargs):
         """Initialize an Amazon API Proxy.
 
         kwargs values are passed directly to Bottlenose. Check the Bottlenose
@@ -156,7 +156,7 @@ class AmazonAPI(object):
         self.aws_associate_tag = aws_associate_tag
         self.region = kwargs.get('Region', 'US')
         self.attempt = 0
-        self.max_attempt = 5 if 'max_attempt' not in kwargs else kwargs['max_attempt']
+        self.max_attempt = max_attempts
 
     def error_handler(self, err):
         """Error handler for 503 (going over query limit)
